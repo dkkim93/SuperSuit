@@ -1,8 +1,8 @@
-from pettingzoo.utils.to_parallel import ParallelEnv
 import gym
+import numpy as np
+from pettingzoo.utils.to_parallel import ParallelEnv
 from gym.spaces import Box, Discrete
 from .adv_transforms.frame_stack import stack_obs_space, stack_init, stack_obs
-from .adv_transforms.frame_skip import check_transform_frameskip
 from .adv_transforms.obs_delay import Delayer
 
 
@@ -85,32 +85,39 @@ class delay_observations(ObservationWrapper):
 class frame_skip(ParallelWraper):
     def __init__(self, env, num_frames):
         super().__init__(env)
-        self.num_frames = check_transform_frameskip(num_frames)
-        self.np_random, seed = gym.utils.seeding.np_random(None)
+        self.num_frames = num_frames
+        self._obs_buffers = {
+            agent: np.zeros((2,) + env.observation_spaces[agent].shape, dtype=np.uint8)
+            for agent in ["first_0", "second_0"]}  # NOTE Assuming two agents with names "first_0" and "second_0"
 
     def seed(self, seed=None):
         self.np_random, seed = gym.utils.seeding.np_random(seed)
         super().seed(seed)
 
     def step(self, action):
-        low, high = self.num_frames
-        num_skips = int(self.np_random.randint(low, high + 1))
+        next_agents = self.env.agents[:]
+        total_reward, total_dones, total_infos = {agent: 0.0 for agent in self.env.agents}, {}, {}
 
-        for x in range(num_skips):
+        for i in range(self.num_frames):
             obs, rews, done, info = super().step(action)
-            if x == 0:
-                next_agents = self.env.agents[:]
-                total_reward = {agent: 0.0 for agent in self.env.agents}
-                total_dones = {}
-                total_infos = {}
-                total_obs = {}
+
+            if i == self.num_frames - 2:
+                for agent in self.env.agents:
+                    self._obs_buffers[agent][0] = obs[agent]
+
+            if i == self.num_frames - 1:
+                for agent in self.env.agents:
+                    self._obs_buffers[agent][1] = obs[agent]
 
             for agent, rew in rews.items():
                 total_reward[agent] += rew
                 total_dones[agent] = done[agent]
                 total_infos[agent] = info[agent]
-                total_obs[agent] = obs[agent]
+
             if all(done.values()):
                 break
+
         self.agents = next_agents
+        total_obs = {agent: self._obs_buffers[agent].max(axis=0) for agent in self.env.agents}
+
         return total_obs, total_reward, total_dones, total_infos
