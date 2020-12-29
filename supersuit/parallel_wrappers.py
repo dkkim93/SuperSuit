@@ -1,4 +1,5 @@
 import gym
+import random
 import numpy as np
 from pettingzoo.utils.to_parallel import ParallelEnv
 from gym.spaces import Box, Discrete
@@ -92,7 +93,8 @@ class frame_skip(ParallelWraper):
 
     def seed(self, seed=None):
         self.np_random, seed = gym.utils.seeding.np_random(seed)
-        super().seed(seed)
+        random.seed(seed)
+        np.random.seed(seed)
 
     def step(self, action):
         next_agents = self.env.agents[:]
