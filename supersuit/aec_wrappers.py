@@ -82,8 +82,8 @@ class color_reduction(BasicObservationWrapper):
 
 
 class resize(BasicObservationWrapper):
-    def __init__(self, env, x_size, y_size, linear_interp=False):
-        scale_tuple = (x_size, y_size, linear_interp)
+    def __init__(self, env, x_size, y_size, linear_interp=False, crop=False):
+        scale_tuple = (x_size, y_size, linear_interp, crop)
         super().__init__(env, basic_transforms.resize, scale_tuple)
 
 
